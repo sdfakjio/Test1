@@ -3,295 +3,456 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>하천 오염 상태 예측 및 벡터 시각화</title>
+    <title>스마트 광학 시뮬레이터: 빛의 경로 추적</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js CDN (그래프 시각화를 위해 사용) -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* Inter 폰트 적용 */
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
         }
-        /* 캔버스 컨테이너 스타일 */
-        #chart-container {
-            position: relative;
-            width: 100%;
-            max-width: 800px; /* 최대 너비 설정 */
-            margin: 0 auto; /* 중앙 정렬 */
-            padding: 1rem;
-            box-sizing: border-box;
+        .container {
+            background-color: #ffffff;
+            border-radius: 1.5rem; /* rounded-3xl */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); /* shadow-2xl */
+            padding: 2.5rem;
+            max-width: 1000px;
+            width: 95%;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .container {
+                flex-direction: row;
+            }
         }
         canvas {
-            background-color: #f8fafc; /* Tailwind gray-50 */
+            background-color: #1a202c; /* Dark background for space/light */
             border-radius: 0.75rem; /* rounded-xl */
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-xl */
-            width: 100% !important; /* 반응형 너비 */
-            height: auto !important; /* 높이 자동 조절 */
+            border: 1px solid #4a5568; /* border-gray-700 */
+            width: 100%;
+            height: 500px; /* 고정 높이 */
+            cursor: crosshair; /* 십자선 커서 */
+        }
+        .controls {
+            flex-shrink: 0; /* 컨트롤 영역이 줄어들지 않도록 */
+            width: 100%;
+            @media (min-width: 768px) {
+                width: 300px;
+            }
+        }
+        .slider-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            font-weight: 600; /* semibold */
+            color: #4a5568; /* gray-700 */
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        input[type="range"] {
+            width: 100%;
+            -webkit-appearance: none;
+            height: 8px;
+            background: #e2e8f0; /* gray-200 */
+            border-radius: 5px;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4299e1; /* blue-500 */
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #4299e1;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        button {
+            background-color: #4299e1; /* blue-500 */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: bold;
+            transition: background-color 0.2s;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #3182ce; /* blue-600 */
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-blue-100 to-green-100 min-h-screen flex items-center justify-center py-8">
-    <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-4xl w-full mx-4">
-        <h1 class="text-4xl font-extrabold text-center text-gray-800 mb-6">
-            하천 오염 상태 예측 및 벡터 시각화
-        </h1>
-        <p class="text-center text-gray-600 mb-8">
-            <span class="font-semibold">나이브 베이즈 알고리즘</span>의 개념을 활용하여 하천 오염 데이터를 분석하고,
-            <span class="font-semibold">벡터</span>로 표현된 지점들을 시각화합니다.
-            <br>이 프로젝트는 MSDS 코딩 및 하천 오염 탐구 경험을 기반으로 합니다.
-        </p>
-
-        <div id="chart-container" class="mb-8">
-            <canvas id="pollutionChart"></canvas>
+<body>
+    <div class="container">
+        <div class="header text-center mb-6 md:mb-0 md:w-full">
+            <h1 class="text-4xl font-extrabold text-gray-900 mb-3">
+                빛의 경로를 추적하다: 스마트 광학 시뮬레이터
+            </h1>
+            <p class="text-gray-600 text-lg">
+                <span class="font-semibold">벡터와 코딩</span>으로 빛의 반사 원리를 탐구하고 시각화합니다.
+            </p>
         </div>
 
-        <div class="text-center text-gray-700">
-            <h2 class="text-2xl font-bold mb-4">시뮬레이션 결과</h2>
-            <div id="predictionResults" class="bg-gray-50 p-4 rounded-lg shadow-inner text-left overflow-x-auto">
-                <!-- 예측 결과가 여기에 표시됩니다 -->
-                <p class="font-semibold mb-2">테스트 데이터 예측 결과:</p>
-                <div id="testPredictions"></div>
+        <div class="simulation-area flex flex-col md:flex-row gap-8 w-full">
+            <canvas id="opticsCanvas"></canvas>
+            <div class="controls bg-gray-50 p-6 rounded-xl shadow-inner">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">시뮬레이션 설정</h2>
+
+                <div class="slider-group">
+                    <label for="rayCount">광선 개수: <span id="rayCountValue">5</span></label>
+                    <input type="range" id="rayCount" min="1" max="50" value="5">
+                </div>
+
+                <div class="slider-group">
+                    <label for="bounceLimit">반사 횟수 제한: <span id="bounceLimitValue">3</span></label>
+                    <input type="range" id="bounceLimit" min="1" max="10" value="3">
+                </div>
+
+                <div class="slider-group">
+                    <label>광원 위치 (클릭으로 변경):</label>
+                    <p class="text-sm text-gray-500">캔버스 위를 클릭하여 광원 위치를 변경하세요.</p>
+                </div>
+
+                <div class="slider-group">
+                    <label>거울 추가:</label>
+                    <button id="addMirrorButton" class="mt-2">새 거울 추가</button>
+                    <p class="text-sm text-gray-500 mt-2">
+                        '새 거울 추가' 후 캔버스에 두 번 클릭하여 거울을 그립니다.
+                    </p>
+                </div>
+                <button id="clearMirrorsButton" class="mt-4 bg-red-500 hover:bg-red-600">모든 거울 지우기</button>
             </div>
         </div>
     </div>
 
     <script>
+        // JavaScript 코드는 여기에 작성됩니다.
         // DOMContentLoaded 이벤트 리스너를 사용하여 문서 로드 후 스크립트 실행
         document.addEventListener('DOMContentLoaded', () => {
-            // 1. 가상 데이터 정의
-            // x_coord, y_coord: 하천 지도상의 가상 좌표 (위치 벡터의 종점)
-            // DO: 용존 산소량 (Dissolved Oxygen)
-            // BOD: 생화학적 산소 요구량 (Biochemical Oxygen Demand)
-            // pH: 수소 이온 농도
-            // status: 오염 상태 (깨끗함, 보통, 오염됨) - 훈련 데이터의 실제 상태
-            const data = [
-                { x_coord: 1, y_coord: 10, DO: 8, BOD: 1, pH: 7.5, status: 'clean' },
-                { x_coord: 2, y_coord: 12, DO: 7.5, BOD: 1.5, pH: 7.2, status: 'clean' },
-                { x_coord: 3, y_coord: 11, DO: 6, BOD: 2, pH: 7.0, status: 'normal' },
-                { x_coord: 4, y_coord: 13, DO: 5, BOD: 3, pH: 6.8, status: 'normal' },
-                { x_coord: 5, y_coord: 14, DO: 4, BOD: 4, pH: 6.5, status: 'polluted' },
-                { x_coord: 6, y_coord: 15, DO: 3.5, BOD: 5, pH: 6.2, status: 'polluted' },
-                { x_coord: 7, y_coord: 16, DO: 3, BOD: 6, pH: 6.0, status: 'polluted' },
-                { x_coord: 8, y_coord: 17, DO: 2.5, BOD: 7, pH: 5.8, status: 'polluted' },
-                { x_coord: 9, y_coord: 18, DO: 2, BOD: 8, pH: 5.5, status: 'polluted' },
-                { x_coord: 10, y_coord: 19, DO: 1.5, BOD: 9, pH: 5.2, status: 'polluted' }
-            ];
+            const canvas = document.getElementById('opticsCanvas');
+            const ctx = canvas.getContext('2d');
 
-            // 오염 상태와 색상 매핑
-            const statusMap = { 'clean': 0, 'normal': 1, 'polluted': 2 };
-            const colors = ['#3B82F6', '#22C55E', '#EF4444']; // Tailwind blue-500, green-500, red-500
+            // 캔버스 크기 설정 (반응형)
+            const setCanvasSize = () => {
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+            };
+            setCanvasSize();
+            window.addEventListener('resize', setCanvasSize);
 
-            // 2. 데이터 분할 (간단한 수동 분할)
-            // 실제 train_test_split 대신, 여기서는 데이터를 수동으로 분할하여 시뮬레이션합니다.
-            // 훈련 데이터 (전체 데이터)
-            const trainData = data;
-            // 테스트 데이터 (새로운 지점이라고 가정)
-            const testData = [
-                { x_coord: 2.5, y_coord: 11.5, DO: 7, BOD: 2, pH: 7.1 }, // 깨끗함에 가까움
-                { x_coord: 5.5, y_coord: 14.5, DO: 4.5, BOD: 4.5, pH: 6.4 }, // 보통/오염됨 경계
-                { x_coord: 8.5, y_coord: 17.5, DO: 2.2, BOD: 7.5, pH: 5.6 }  // 오염됨에 가까움
-            ];
-
-            // 3. 나이브 베이즈 예측 시뮬레이션 함수
-            // 실제 나이브 베이즈 알고리즘 대신, 간단한 규칙 기반으로 오염 상태를 예측합니다.
-            // 이 함수는 DO, BOD, pH 값을 기반으로 'clean', 'normal', 'polluted'를 반환합니다.
-            // 또한, 각 상태에 대한 '확률'도 시뮬레이션하여 반환합니다.
-            function simulateNaiveBayesPredict(doValue, bodValue, phValue) {
-                let predictedStatus = 'normal'; // 기본값
-                let probabilities = { 'clean': 0.33, 'normal': 0.34, 'polluted': 0.33 }; // 초기 균등 확률
-
-                // DO (용존 산소량) 기준
-                if (doValue >= 6.5) {
-                    predictedStatus = 'clean';
-                    probabilities = { 'clean': 0.8, 'normal': 0.15, 'polluted': 0.05 };
-                } else if (doValue <= 3.0) {
-                    predictedStatus = 'polluted';
-                    probabilities = { 'clean': 0.05, 'normal': 0.15, 'polluted': 0.8 };
+            // --- 2.2. 벡터 클래스 정의 ---
+            class Vector {
+                constructor(x, y) {
+                    this.x = x;
+                    this.y = y;
                 }
 
-                // BOD (생화학적 산소 요구량) 기준 (DO와 결합)
-                if (bodValue <= 2.0 && predictedStatus === 'clean') {
-                    probabilities['clean'] += 0.1; // 더 깨끗할 확률 높임
-                } else if (bodValue >= 6.0 && predictedStatus === 'polluted') {
-                    probabilities['polluted'] += 0.1; // 더 오염될 확률 높임
+                // 벡터 덧셈
+                add(other) {
+                    return new Vector(this.x + other.x, this.y + other.y);
                 }
 
-                // pH 기준 (DO, BOD와 결합)
-                if (phValue >= 6.5 && phValue <= 7.5) { // 중성
-                    if (predictedStatus === 'polluted') {
-                        probabilities['polluted'] -= 0.05; // 오염 확률 약간 낮춤
-                        probabilities['normal'] += 0.05;
-                    }
-                } else if (phValue < 6.0 || phValue > 8.0) { // 산성 또는 염기성
-                    if (predictedStatus === 'clean') {
-                        probabilities['clean'] -= 0.05; // 깨끗할 확률 약간 낮춤
-                        probabilities['normal'] += 0.05;
-                    }
+                // 벡터 뺄셈
+                subtract(other) {
+                    return new Vector(this.x - other.x, this.y - other.y);
                 }
 
-                // 확률 정규화 (합이 1이 되도록)
-                const sumProbs = Object.values(probabilities).reduce((a, b) => a + b, 0);
-                for (const key in probabilities) {
-                    probabilities[key] /= sumProbs;
+                // 스칼라 곱셈
+                scale(scalar) {
+                    return new Vector(this.x * scalar, this.y * scalar);
                 }
 
-                // 가장 높은 확률을 가진 상태를 최종 예측 상태로 결정
-                let finalPredictedStatus = 'normal';
-                let maxProba = 0;
-                for (const status in probabilities) {
-                    if (probabilities[status] > maxProba) {
-                        maxProba = probabilities[status];
-                        finalPredictedStatus = status;
-                    }
+                // 내적 (Dot Product)
+                dot(other) {
+                    return this.x * other.x + this.y * other.y;
                 }
-                
-                return {
-                    predictedStatus: finalPredictedStatus,
-                    probabilities: probabilities
-                };
+
+                // 벡터의 크기 (Magnitude)
+                magnitude() {
+                    return Math.sqrt(this.x * this.x + this.y * this.y);
+                }
+
+                // 단위 벡터 (정규화)
+                normalize() {
+                    const mag = this.magnitude();
+                    return mag === 0 ? new Vector(0, 0) : new Vector(this.x / mag, this.y / mag);
+                }
+
+                // 벡터 회전 (라디안)
+                rotate(angle) {
+                    const cos = Math.cos(angle);
+                    const sin = Math.sin(angle);
+                    return new Vector(
+                        this.x * cos - this.y * sin,
+                        this.x * sin + this.y * cos
+                    );
+                }
             }
 
-            // 테스트 데이터에 대한 예측 수행
-            const predictedResults = testData.map(point => {
-                const prediction = simulateNaiveBayesPredict(point.DO, point.BOD, point.pH);
-                return {
-                    ...point,
-                    predictedStatus: prediction.predictedStatus,
-                    probabilities: prediction.probabilities
-                };
-            });
+            // --- 2.3. 광선 (Ray) 클래스 정의 ---
+            class Ray {
+                constructor(origin, direction) {
+                    this.origin = origin; // Vector 객체
+                    this.direction = direction.normalize(); // Vector 객체, 단위 벡터로 정규화
+                }
 
-            // 4. Chart.js 데이터 준비
-            const chartData = {
-                datasets: [
-                    {
-                        label: '훈련 데이터 (실제 상태)',
-                        data: trainData.map(d => ({ x: d.x_coord, y: d.y_coord })),
-                        backgroundColor: trainData.map(d => colors[statusMap[d.status]]),
-                        borderColor: 'rgba(0, 0, 0, 0.5)',
-                        borderWidth: 1,
-                        pointRadius: 8,
-                        pointHoverRadius: 10,
-                        pointStyle: 'circle'
-                    },
-                    {
-                        label: '테스트 데이터 (예측 상태)',
-                        data: predictedResults.map(d => ({ x: d.x_coord, y: d.y_coord })),
-                        // 예측 확률에 따라 색상 농도 조절 (오염됨 상태에 대해)
-                        backgroundColor: predictedResults.map(d => {
-                            if (d.predictedStatus === 'polluted') {
-                                // 오염됨 확률에 따라 빨간색 농도 조절 (RGB)
-                                const proba = d.probabilities['polluted'];
-                                return `rgba(239, 68, 68, ${0.4 + proba * 0.6})`; // 최소 투명도 0.4, 최대 1.0
-                            }
-                            return colors[statusMap[d.predictedStatus]];
-                        }),
-                        borderColor: 'black',
-                        borderWidth: 2,
-                        pointRadius: 12,
-                        pointHoverRadius: 15,
-                        pointStyle: 'crossRot', // 'X' 마커
-                        rotation: 45 // 'X' 마커를 위한 회전
+                // 광선 그리기
+                draw(ctx, length = 1000, color = 'rgba(255, 255, 0, 0.8)') {
+                    ctx.beginPath();
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 1.5;
+                    ctx.moveTo(this.origin.x, this.origin.y);
+                    const endPoint = this.origin.add(this.direction.scale(length));
+                    ctx.lineTo(endPoint.x, endPoint.y);
+                    ctx.stroke();
+                }
+            }
+
+            // --- 2.4. 거울 (Mirror) 클래스 정의 ---
+            class Mirror {
+                constructor(p1, p2) {
+                    this.p1 = p1; // Vector 객체
+                    this.p2 = p2; // Vector 객체
+                }
+
+                // 거울 그리기
+                draw(ctx) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(173, 216, 230, 0.9)'; // Light blue
+                    ctx.lineWidth = 4;
+                    ctx.lineCap = 'round'; // 끝을 둥글게
+                    ctx.moveTo(this.p1.x, this.p1.y);
+                    ctx.lineTo(this.p2.x, this.p2.y);
+                    ctx.stroke();
+
+                    // 거울 끝에 작은 원 표시
+                    ctx.fillStyle = 'rgba(173, 216, 230, 1)';
+                    ctx.beginPath();
+                    ctx.arc(this.p1.x, this.p1.y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(this.p2.x, this.p2.y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // 광선과 거울의 교점 계산
+                // 반환: { intersection: Vector, t: number, s: number } 또는 null
+                getIntersection(ray) {
+                    const x1 = ray.origin.x, y1 = ray.origin.y; // 광선 시작점
+                    const x2 = ray.origin.x + ray.direction.x, y2 = ray.origin.y + ray.direction.y; // 광선 방향점
+
+                    const x3 = this.p1.x, y3 = this.p1.y; // 거울 시작점
+                    const x4 = this.p2.x, y4 = this.p2.y; // 거울 끝점
+
+                    const den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+                    if (den === 0) { // 평행하거나 같은 선상에 있음
+                        return null;
                     }
-                ]
+
+                    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+                    const s = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
+
+                    // t > 0: 광선이 앞으로 나아감
+                    // 0 <= s <= 1: 교점이 선분 내부에 있음
+                    if (t > 0 && s >= 0 && s <= 1) {
+                        const intersectionPoint = ray.origin.add(ray.direction.scale(t));
+                        return { intersection: intersectionPoint, t: t, s: s };
+                    }
+                    return null;
+                }
+
+                // 거울의 법선 벡터 계산
+                getNormal(rayDirection) {
+                    const lineVec = this.p2.subtract(this.p1);
+                    // 법선 벡터는 (dy, -dx) 또는 (-dy, dx)
+                    let normal = new Vector(-lineVec.y, lineVec.x).normalize();
+
+                    // 법선 벡터가 광선 방향과 반대 방향을 향하도록 조정 (빛이 들어오는 면)
+                    // 즉, 법선과 입사광선 방향의 내적이 음수가 되도록
+                    if (rayDirection.dot(normal) > 0) {
+                        normal = normal.scale(-1);
+                    }
+                    return normal;
+                }
+            }
+
+            // --- 2.5. 전역 변수 및 초기 설정 ---
+            let lightSource = new Vector(canvas.width / 2, canvas.height / 2); // 광원 초기 위치
+            let mirrors = []; // 거울 배열
+            let drawingMirror = false; // 거울 그리기 모드 플래그
+            let currentMirrorStartPoint = null; // 현재 그리는 거울의 시작점
+
+            const rayCountSlider = document.getElementById('rayCount');
+            const rayCountValueSpan = document.getElementById('rayCountValue');
+            const bounceLimitSlider = document.getElementById('bounceLimit');
+            const bounceLimitValueSpan = document.getElementById('bounceLimitValue');
+            const addMirrorButton = document.getElementById('addMirrorButton');
+            const clearMirrorsButton = document.getElementById('clearMirrorsButton');
+
+            // 슬라이더 값 업데이트
+            rayCountSlider.oninput = () => {
+                rayCountValueSpan.textContent = rayCountSlider.value;
+                drawSimulation();
+            };
+            bounceLimitSlider.oninput = () => {
+                bounceLimitValueSpan.textContent = bounceLimitSlider.value;
+                drawSimulation();
             };
 
-            // 5. Chart.js 그래프 생성
-            const ctx = document.getElementById('pollutionChart').getContext('2d');
-            const pollutionChart = new Chart(ctx, {
-                type: 'scatter', // 산점도 타입
-                data: chartData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true, // 비율 유지
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: '하천 오염 상태 시각화',
-                            font: { size: 20, weight: 'bold' },
-                            color: '#333'
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const index = context.dataIndex;
-                                    const datasetIndex = context.datasetIndex;
-                                    let label = context.dataset.label || '';
-
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    
-                                    if (datasetIndex === 0) { // 훈련 데이터
-                                        const originalData = trainData[index];
-                                        return [
-                                            `위치: (${originalData.x_coord}, ${originalData.y_coord})`,
-                                            `DO: ${originalData.DO}`,
-                                            `BOD: ${originalData.BOD}`,
-                                            `pH: ${originalData.pH}`,
-                                            `상태: ${originalData.status}`
-                                        ];
-                                    } else { // 테스트 데이터 (예측)
-                                        const predictedPoint = predictedResults[index];
-                                        const probas = predictedPoint.probabilities;
-                                        return [
-                                            `위치: (${predictedPoint.x_coord}, ${predictedPoint.y_coord})`,
-                                            `DO: ${predictedPoint.DO}`,
-                                            `BOD: ${predictedPoint.BOD}`,
-                                            `pH: ${predictedPoint.pH}`,
-                                            `예측 상태: ${predictedPoint.predictedStatus}`,
-                                            `확률: 깨끗함(${probas.clean.toFixed(2)}), 보통(${probas.normal.toFixed(2)}), 오염됨(${probas.polluted.toFixed(2)})`
-                                        ];
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            type: 'linear',
-                            position: 'bottom',
-                            title: {
-                                display: true,
-                                text: '하천 X 좌표',
-                                font: { size: 16, weight: 'bold' }
-                            },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.05)'
-                            }
-                        },
-                        y: {
-                            type: 'linear',
-                            title: {
-                                display: true,
-                                text: '하천 Y 좌표',
-                                font: { size: 16, weight: 'bold' }
-                            },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.05)'
-                            }
-                        }
+            // 광원 위치 변경 (클릭 이벤트)
+            canvas.addEventListener('click', (e) => {
+                if (drawingMirror) { // 거울 그리기 모드일 때는 광원 변경 안 함
+                    if (!currentMirrorStartPoint) {
+                        currentMirrorStartPoint = new Vector(e.offsetX, e.offsetY);
+                    } else {
+                        mirrors.push(new Mirror(currentMirrorStartPoint, new Vector(e.offsetX, e.offsetY)));
+                        currentMirrorStartPoint = null;
+                        drawingMirror = false;
+                        addMirrorButton.textContent = "새 거울 추가"; // 버튼 텍스트 복원
+                        drawSimulation();
                     }
+                } else {
+                    lightSource = new Vector(e.offsetX, e.offsetY);
+                    drawSimulation();
                 }
             });
 
-            // 6. 예측 결과 텍스트로 표시
-            const predictionResultsDiv = document.getElementById('testPredictions');
-            predictedResults.forEach(point => {
-                const p = document.createElement('p');
-                const probas = point.probabilities;
-                p.innerHTML = `
-                    <span class="font-medium">위치 (${point.x_coord}, ${point.y_coord}):</span>
-                    DO: ${point.DO}, BOD: ${point.BOD}, pH: ${point.pH} <br>
-                    &nbsp;&nbsp;&nbsp;예측 상태: <span class="font-bold" style="color:${colors[statusMap[point.predictedStatus]]}">${point.predictedStatus}</span><br>
-                    &nbsp;&nbsp;&nbsp;확률: 깨끗함(${probas.clean.toFixed(2)}), 보통(${probas.normal.toFixed(2)}), 오염됨(${probas.polluted.toFixed(2)})
-                `;
-                p.classList.add('mb-2', 'pb-2', 'border-b', 'border-gray-200');
-                predictionResultsDiv.appendChild(p);
+            // 새 거울 추가 버튼 클릭 이벤트
+            addMirrorButton.addEventListener('click', () => {
+                drawingMirror = !drawingMirror; // 토글
+                if (drawingMirror) {
+                    addMirrorButton.textContent = "거울 그리는 중...";
+                    currentMirrorStartPoint = null; // 새 거울 시작점 초기화
+                } else {
+                    addMirrorButton.textContent = "새 거울 추가";
+                }
             });
+
+            // 모든 거울 지우기 버튼 클릭 이벤트
+            clearMirrorsButton.addEventListener('click', () => {
+                mirrors = [];
+                currentMirrorStartPoint = null;
+                drawingMirror = false;
+                addMirrorButton.textContent = "새 거울 추가";
+                drawSimulation();
+            });
+
+
+            // --- 2.6. 메인 시뮬레이션 루프 ---
+            function drawSimulation() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height); // 캔버스 지우기
+                ctx.fillStyle = '#1a202c'; // 배경색 다시 칠하기
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // 광원 그리기
+                ctx.beginPath();
+                ctx.arc(lightSource.x, lightSource.y, 5, 0, Math.PI * 2);
+                ctx.fillStyle = 'yellow';
+                ctx.fill();
+
+                // 거울 그리기
+                mirrors.forEach(mirror => mirror.draw(ctx));
+
+                // 현재 그리는 거울 미리보기
+                if (drawingMirror && currentMirrorStartPoint) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; // 미리보기 색상
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]); // 점선
+                    ctx.moveTo(currentMirrorStartPoint.x, currentMirrorStartPoint.y);
+                    canvas.addEventListener('mousemove', function previewMirror(e) {
+                        if (drawingMirror && currentMirrorStartPoint) {
+                            drawSimulation(); // 기존 내용 다시 그리고
+                            ctx.beginPath();
+                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                            ctx.lineWidth = 2;
+                            ctx.setLineDash([5, 5]);
+                            ctx.moveTo(currentMirrorStartPoint.x, currentMirrorStartPoint.y);
+                            ctx.lineTo(e.offsetX, e.offsetY);
+                            ctx.stroke();
+                        } else {
+                            canvas.removeEventListener('mousemove', previewMirror);
+                        }
+                    });
+                }
+                ctx.setLineDash([]); // 점선 설정 해제
+
+                // 광선 추적 및 그리기
+                const numRays = parseInt(rayCountSlider.value);
+                const bounceLimit = parseInt(bounceLimitSlider.value);
+
+                for (let i = 0; i < numRays; i++) {
+                    // 광선 시작 각도 (360도 전체 또는 특정 범위)
+                    const angle = (i / numRays) * Math.PI * 2; // 전체 360도
+                    // 특정 방향으로만 광선을 쏘고 싶다면 각도 범위 조절
+                    // const angle = (i / numRays) * (Math.PI / 2) + (Math.PI / 4); // 45도 ~ 135도 범위
+
+                    let currentRay = new Ray(lightSource, new Vector(Math.cos(angle), Math.sin(angle)));
+                    let currentOrigin = lightSource;
+                    let currentDirection = currentRay.direction;
+
+                    for (let bounce = 0; bounce < bounceLimit; bounce++) {
+                        let closestIntersection = null;
+                        let closestMirror = null;
+                        let minDistance = Infinity;
+
+                        // 모든 거울에 대해 가장 가까운 교점 찾기
+                        mirrors.forEach(mirror => {
+                            const intersectionData = mirror.getIntersection(currentRay);
+                            if (intersectionData) {
+                                // 광선 시작점에서 교점까지의 거리
+                                const distance = currentOrigin.subtract(intersectionData.intersection).magnitude();
+                                if (distance < minDistance) {
+                                    minDistance = distance;
+                                    closestIntersection = intersectionData.intersection;
+                                    closestMirror = mirror;
+                                }
+                            }
+                        });
+
+                        if (closestIntersection && closestMirror) {
+                            // 광선이 거울에 도달한 부분 그리기
+                            ctx.beginPath();
+                            ctx.strokeStyle = `rgba(255, 255, 0, ${1 - bounce * 0.2})`; // 반사 횟수에 따라 투명도 감소
+                            ctx.lineWidth = 1.5;
+                            ctx.moveTo(currentOrigin.x, currentOrigin.y);
+                            ctx.lineTo(closestIntersection.x, closestIntersection.y);
+                            ctx.stroke();
+
+                            // 반사된 광선 계산
+                            const normal = closestMirror.getNormal(currentDirection);
+                            const reflectedDirection = currentDirection.subtract(normal.scale(2 * currentDirection.dot(normal)));
+                            
+                            // 다음 광선 설정
+                            currentOrigin = closestIntersection;
+                            currentDirection = reflectedDirection.normalize();
+                            currentRay = new Ray(currentOrigin, currentDirection);
+                        } else {
+                            // 더 이상 충돌할 거울이 없으면 남은 광선 그리기
+                            currentRay.draw(ctx, 1000, `rgba(255, 255, 0, ${1 - bounce * 0.2})`);
+                            break; // 더 이상 반사할 것이 없으므로 루프 종료
+                        }
+                    }
+                }
+            }
+
+            // 초기 시뮬레이션 그리기
+            drawSimulation();
         });
     </script>
 </body>
 </html>
-
