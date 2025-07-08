@@ -1,0 +1,98 @@
+from sklearn.naive_bayes import GaussianNB
+from sklearn.model_selection import train_test_split
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+# 가상 데이터 생성 (예시)
+# x_coord, y_coord: 하천 지도상의 가상 좌표
+# DO: 용존 산소량 (Dissolved Oxygen)
+# BOD: 생화학적 산소 요구량 (Biochemical Oxygen Demand)
+# pH: 수소 이온 농도
+# status: 오염 상태 (깨끗함, 보통, 오염됨)
+data = {
+    'x_coord': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    'y_coord': [10, 12, 11, 13, 14, 15, 16, 17, 18, 19],
+    'DO': [8, 7.5, 6, 5, 4, 3.5, 3, 2.5, 2, 1.5],
+    'BOD': [1, 1.5, 2, 3, 4, 5, 6, 7, 8, 9],
+    'pH': [7.5, 7.2, 7.0, 6.8, 6.5, 6.2, 6.0, 5.8, 5.5, 5.2],
+    'status': ['clean', 'clean', 'normal', 'normal', 'polluted', 'polluted', 'polluted', 'polluted', 'polluted', 'polluted']
+}
+df = pd.DataFrame(data)
+
+# 오염 상태(status)를 나이브 베이즈 모델이 처리할 수 있도록 숫자로 인코딩
+status_map = {'clean': 0, 'normal': 1, 'polluted': 2}
+df['status_encoded'] = df['status'].map(status_map)
+
+# 특징(X)과 타겟(y) 데이터 분리
+# X: DO, BOD, pH 값 (오염 상태를 예측하는 데 사용될 특징)
+# y: status_encoded (예측하려는 오염 상태)
+X = df[['DO', 'BOD', 'pH']]
+y = df['status_encoded']
+
+# 데이터를 훈련 세트와 테스트 세트로 분할
+# test_size=0.3: 전체 데이터의 30%를 테스트 데이터로 사용
+# random_state=42: 결과를 재현 가능하게 하기 위한 시드 값
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# 가우시안 나이브 베이즈 모델 초기화 및 훈련
+# 가우시안 나이브 베이즈는 특징들이 정규 분포를 따른다고 가정하는 모델입니다.
+model = GaussianNB()
+model.fit(X_train, y_train)
+
+# 테스트 데이터에 대한 예측 및 확률 예측
+# y_pred: 모델이 예측한 오염 상태 (인코딩된 숫자)
+# y_pred_proba: 각 클래스(깨끗함, 보통, 오염됨)에 대한 예측 확률
+y_pred = model.predict(X_test)
+y_pred_proba = model.predict_proba(X_test)
+
+# 예측 결과 및 확률 출력 (수정된 print 문)
+print("예측 결과 (인코딩된 상태): " + str(y_pred))
+print("예측 확률 (클래스별): " + str(y_pred_proba))
+
+# 시각화 설정
+plt.figure(figsize=(10, 6))
+
+# 훈련 데이터 시각화 (위치 벡터)
+# 각 오염 상태별로 다른 색상으로 점을 표시하여 훈련 데이터를 나타냅니다.
+colors = ['blue', 'green', 'red'] # clean, normal, polluted 순서
+for i, status_name in enumerate(status_map.keys()):
+    subset = df[df['status'] == status_name]
+    plt.scatter(subset['x_coord'], subset['y_coord'],
+                label=f'Training - {status_name}',
+                color=colors[i], s=100, alpha=0.7)
+
+# 예측 결과 시각화 (테스트 데이터)
+# 테스트 데이터의 위치에 예측된 오염 상태를 'X' 마커로 표시합니다.
+# 'polluted' 상태에 대한 예측 확률이 높을수록 색상을 더 진하게 하여 오염도를 시각적으로 표현합니다.
+test_coords = df.loc[X_test.index, ['x_coord', 'y_coord']]
+for i, (idx, row) in enumerate(test_coords.iterrows()):
+    predicted_status_encoded = y_pred[i]
+    
+    # 예측된 오염 상태에 따라 색상 결정
+    color_to_use = colors[predicted_status_encoded]
+
+    # 'polluted' 클래스에 대한 확률을 색상 강도에 반영 (선택적)
+    if predicted_status_encoded == status_map['polluted']:
+        proba_polluted = y_pred_proba[i, status_map['polluted']]
+        # 빨간색 (1, 0, 0)에 proba_polluted를 곱하여 농도 조절
+        color_to_use = (proba_polluted, 0.1, 0.1)
+    
+    # 범례 중복 방지를 위해 첫 번째 예측 결과에만 레이블 추가
+    label_text = ""
+    if i == 0: # 첫 번째 테스트 데이터 포인트에만 범례 추가
+        label_text = f'Predicted - {list(status_map.keys())[predicted_status_encoded]} (proba: {y_pred_proba[i].max():.2f})'
+
+    plt.scatter(row['x_coord'], row['y_coord'],
+                marker='X', s=200, color=color_to_use,
+                label=label_text,
+                edgecolor='black', linewidth=1)
+
+# 그래프 제목 및 축 레이블 설정
+plt.title('하천 오염 상태 예측 및 벡터 시각화')
+plt.xlabel('하천 X 좌표')
+plt.ylabel('하천 Y 좌표')
+plt.grid(True) # 격자 표시
+plt.legend() # 범례 표시
+plt.show() # 그래프 출력
+
