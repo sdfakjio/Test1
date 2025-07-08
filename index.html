@@ -1,98 +1,297 @@
-from sklearn.naive_bayes import GaussianNB
-from sklearn.model_selection import train_test_split
-import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>하천 오염 상태 예측 및 벡터 시각화</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN (그래프 시각화를 위해 사용) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Inter 폰트 적용 */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* 캔버스 컨테이너 스타일 */
+        #chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px; /* 최대 너비 설정 */
+            margin: 0 auto; /* 중앙 정렬 */
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        canvas {
+            background-color: #f8fafc; /* Tailwind gray-50 */
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-xl */
+            width: 100% !important; /* 반응형 너비 */
+            height: auto !important; /* 높이 자동 조절 */
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-100 to-green-100 min-h-screen flex items-center justify-center py-8">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-4xl w-full mx-4">
+        <h1 class="text-4xl font-extrabold text-center text-gray-800 mb-6">
+            하천 오염 상태 예측 및 벡터 시각화
+        </h1>
+        <p class="text-center text-gray-600 mb-8">
+            <span class="font-semibold">나이브 베이즈 알고리즘</span>의 개념을 활용하여 하천 오염 데이터를 분석하고,
+            <span class="font-semibold">벡터</span>로 표현된 지점들을 시각화합니다.
+            <br>이 프로젝트는 MSDS 코딩 및 하천 오염 탐구 경험을 기반으로 합니다.
+        </p>
 
-# 가상 데이터 생성 (예시)
-# x_coord, y_coord: 하천 지도상의 가상 좌표
-# DO: 용존 산소량 (Dissolved Oxygen)
-# BOD: 생화학적 산소 요구량 (Biochemical Oxygen Demand)
-# pH: 수소 이온 농도
-# status: 오염 상태 (깨끗함, 보통, 오염됨)
-data = {
-    'x_coord': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-    'y_coord': [10, 12, 11, 13, 14, 15, 16, 17, 18, 19],
-    'DO': [8, 7.5, 6, 5, 4, 3.5, 3, 2.5, 2, 1.5],
-    'BOD': [1, 1.5, 2, 3, 4, 5, 6, 7, 8, 9],
-    'pH': [7.5, 7.2, 7.0, 6.8, 6.5, 6.2, 6.0, 5.8, 5.5, 5.2],
-    'status': ['clean', 'clean', 'normal', 'normal', 'polluted', 'polluted', 'polluted', 'polluted', 'polluted', 'polluted']
-}
-df = pd.DataFrame(data)
+        <div id="chart-container" class="mb-8">
+            <canvas id="pollutionChart"></canvas>
+        </div>
 
-# 오염 상태(status)를 나이브 베이즈 모델이 처리할 수 있도록 숫자로 인코딩
-status_map = {'clean': 0, 'normal': 1, 'polluted': 2}
-df['status_encoded'] = df['status'].map(status_map)
+        <div class="text-center text-gray-700">
+            <h2 class="text-2xl font-bold mb-4">시뮬레이션 결과</h2>
+            <div id="predictionResults" class="bg-gray-50 p-4 rounded-lg shadow-inner text-left overflow-x-auto">
+                <!-- 예측 결과가 여기에 표시됩니다 -->
+                <p class="font-semibold mb-2">테스트 데이터 예측 결과:</p>
+                <div id="testPredictions"></div>
+            </div>
+        </div>
+    </div>
 
-# 특징(X)과 타겟(y) 데이터 분리
-# X: DO, BOD, pH 값 (오염 상태를 예측하는 데 사용될 특징)
-# y: status_encoded (예측하려는 오염 상태)
-X = df[['DO', 'BOD', 'pH']]
-y = df['status_encoded']
+    <script>
+        // DOMContentLoaded 이벤트 리스너를 사용하여 문서 로드 후 스크립트 실행
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. 가상 데이터 정의
+            // x_coord, y_coord: 하천 지도상의 가상 좌표 (위치 벡터의 종점)
+            // DO: 용존 산소량 (Dissolved Oxygen)
+            // BOD: 생화학적 산소 요구량 (Biochemical Oxygen Demand)
+            // pH: 수소 이온 농도
+            // status: 오염 상태 (깨끗함, 보통, 오염됨) - 훈련 데이터의 실제 상태
+            const data = [
+                { x_coord: 1, y_coord: 10, DO: 8, BOD: 1, pH: 7.5, status: 'clean' },
+                { x_coord: 2, y_coord: 12, DO: 7.5, BOD: 1.5, pH: 7.2, status: 'clean' },
+                { x_coord: 3, y_coord: 11, DO: 6, BOD: 2, pH: 7.0, status: 'normal' },
+                { x_coord: 4, y_coord: 13, DO: 5, BOD: 3, pH: 6.8, status: 'normal' },
+                { x_coord: 5, y_coord: 14, DO: 4, BOD: 4, pH: 6.5, status: 'polluted' },
+                { x_coord: 6, y_coord: 15, DO: 3.5, BOD: 5, pH: 6.2, status: 'polluted' },
+                { x_coord: 7, y_coord: 16, DO: 3, BOD: 6, pH: 6.0, status: 'polluted' },
+                { x_coord: 8, y_coord: 17, DO: 2.5, BOD: 7, pH: 5.8, status: 'polluted' },
+                { x_coord: 9, y_coord: 18, DO: 2, BOD: 8, pH: 5.5, status: 'polluted' },
+                { x_coord: 10, y_coord: 19, DO: 1.5, BOD: 9, pH: 5.2, status: 'polluted' }
+            ];
 
-# 데이터를 훈련 세트와 테스트 세트로 분할
-# test_size=0.3: 전체 데이터의 30%를 테스트 데이터로 사용
-# random_state=42: 결과를 재현 가능하게 하기 위한 시드 값
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+            // 오염 상태와 색상 매핑
+            const statusMap = { 'clean': 0, 'normal': 1, 'polluted': 2 };
+            const colors = ['#3B82F6', '#22C55E', '#EF4444']; // Tailwind blue-500, green-500, red-500
 
-# 가우시안 나이브 베이즈 모델 초기화 및 훈련
-# 가우시안 나이브 베이즈는 특징들이 정규 분포를 따른다고 가정하는 모델입니다.
-model = GaussianNB()
-model.fit(X_train, y_train)
+            // 2. 데이터 분할 (간단한 수동 분할)
+            // 실제 train_test_split 대신, 여기서는 데이터를 수동으로 분할하여 시뮬레이션합니다.
+            // 훈련 데이터 (전체 데이터)
+            const trainData = data;
+            // 테스트 데이터 (새로운 지점이라고 가정)
+            const testData = [
+                { x_coord: 2.5, y_coord: 11.5, DO: 7, BOD: 2, pH: 7.1 }, // 깨끗함에 가까움
+                { x_coord: 5.5, y_coord: 14.5, DO: 4.5, BOD: 4.5, pH: 6.4 }, // 보통/오염됨 경계
+                { x_coord: 8.5, y_coord: 17.5, DO: 2.2, BOD: 7.5, pH: 5.6 }  // 오염됨에 가까움
+            ];
 
-# 테스트 데이터에 대한 예측 및 확률 예측
-# y_pred: 모델이 예측한 오염 상태 (인코딩된 숫자)
-# y_pred_proba: 각 클래스(깨끗함, 보통, 오염됨)에 대한 예측 확률
-y_pred = model.predict(X_test)
-y_pred_proba = model.predict_proba(X_test)
+            // 3. 나이브 베이즈 예측 시뮬레이션 함수
+            // 실제 나이브 베이즈 알고리즘 대신, 간단한 규칙 기반으로 오염 상태를 예측합니다.
+            // 이 함수는 DO, BOD, pH 값을 기반으로 'clean', 'normal', 'polluted'를 반환합니다.
+            // 또한, 각 상태에 대한 '확률'도 시뮬레이션하여 반환합니다.
+            function simulateNaiveBayesPredict(doValue, bodValue, phValue) {
+                let predictedStatus = 'normal'; // 기본값
+                let probabilities = { 'clean': 0.33, 'normal': 0.34, 'polluted': 0.33 }; // 초기 균등 확률
 
-# 예측 결과 및 확률 출력 (수정된 print 문)
-print("예측 결과 (인코딩된 상태): " + str(y_pred))
-print("예측 확률 (클래스별): " + str(y_pred_proba))
+                // DO (용존 산소량) 기준
+                if (doValue >= 6.5) {
+                    predictedStatus = 'clean';
+                    probabilities = { 'clean': 0.8, 'normal': 0.15, 'polluted': 0.05 };
+                } else if (doValue <= 3.0) {
+                    predictedStatus = 'polluted';
+                    probabilities = { 'clean': 0.05, 'normal': 0.15, 'polluted': 0.8 };
+                }
 
-# 시각화 설정
-plt.figure(figsize=(10, 6))
+                // BOD (생화학적 산소 요구량) 기준 (DO와 결합)
+                if (bodValue <= 2.0 && predictedStatus === 'clean') {
+                    probabilities['clean'] += 0.1; // 더 깨끗할 확률 높임
+                } else if (bodValue >= 6.0 && predictedStatus === 'polluted') {
+                    probabilities['polluted'] += 0.1; // 더 오염될 확률 높임
+                }
 
-# 훈련 데이터 시각화 (위치 벡터)
-# 각 오염 상태별로 다른 색상으로 점을 표시하여 훈련 데이터를 나타냅니다.
-colors = ['blue', 'green', 'red'] # clean, normal, polluted 순서
-for i, status_name in enumerate(status_map.keys()):
-    subset = df[df['status'] == status_name]
-    plt.scatter(subset['x_coord'], subset['y_coord'],
-                label=f'Training - {status_name}',
-                color=colors[i], s=100, alpha=0.7)
+                // pH 기준 (DO, BOD와 결합)
+                if (phValue >= 6.5 && phValue <= 7.5) { // 중성
+                    if (predictedStatus === 'polluted') {
+                        probabilities['polluted'] -= 0.05; // 오염 확률 약간 낮춤
+                        probabilities['normal'] += 0.05;
+                    }
+                } else if (phValue < 6.0 || phValue > 8.0) { // 산성 또는 염기성
+                    if (predictedStatus === 'clean') {
+                        probabilities['clean'] -= 0.05; // 깨끗할 확률 약간 낮춤
+                        probabilities['normal'] += 0.05;
+                    }
+                }
 
-# 예측 결과 시각화 (테스트 데이터)
-# 테스트 데이터의 위치에 예측된 오염 상태를 'X' 마커로 표시합니다.
-# 'polluted' 상태에 대한 예측 확률이 높을수록 색상을 더 진하게 하여 오염도를 시각적으로 표현합니다.
-test_coords = df.loc[X_test.index, ['x_coord', 'y_coord']]
-for i, (idx, row) in enumerate(test_coords.iterrows()):
-    predicted_status_encoded = y_pred[i]
-    
-    # 예측된 오염 상태에 따라 색상 결정
-    color_to_use = colors[predicted_status_encoded]
+                // 확률 정규화 (합이 1이 되도록)
+                const sumProbs = Object.values(probabilities).reduce((a, b) => a + b, 0);
+                for (const key in probabilities) {
+                    probabilities[key] /= sumProbs;
+                }
 
-    # 'polluted' 클래스에 대한 확률을 색상 강도에 반영 (선택적)
-    if predicted_status_encoded == status_map['polluted']:
-        proba_polluted = y_pred_proba[i, status_map['polluted']]
-        # 빨간색 (1, 0, 0)에 proba_polluted를 곱하여 농도 조절
-        color_to_use = (proba_polluted, 0.1, 0.1)
-    
-    # 범례 중복 방지를 위해 첫 번째 예측 결과에만 레이블 추가
-    label_text = ""
-    if i == 0: # 첫 번째 테스트 데이터 포인트에만 범례 추가
-        label_text = f'Predicted - {list(status_map.keys())[predicted_status_encoded]} (proba: {y_pred_proba[i].max():.2f})'
+                // 가장 높은 확률을 가진 상태를 최종 예측 상태로 결정
+                let finalPredictedStatus = 'normal';
+                let maxProba = 0;
+                for (const status in probabilities) {
+                    if (probabilities[status] > maxProba) {
+                        maxProba = probabilities[status];
+                        finalPredictedStatus = status;
+                    }
+                }
+                
+                return {
+                    predictedStatus: finalPredictedStatus,
+                    probabilities: probabilities
+                };
+            }
 
-    plt.scatter(row['x_coord'], row['y_coord'],
-                marker='X', s=200, color=color_to_use,
-                label=label_text,
-                edgecolor='black', linewidth=1)
+            // 테스트 데이터에 대한 예측 수행
+            const predictedResults = testData.map(point => {
+                const prediction = simulateNaiveBayesPredict(point.DO, point.BOD, point.pH);
+                return {
+                    ...point,
+                    predictedStatus: prediction.predictedStatus,
+                    probabilities: prediction.probabilities
+                };
+            });
 
-# 그래프 제목 및 축 레이블 설정
-plt.title('하천 오염 상태 예측 및 벡터 시각화')
-plt.xlabel('하천 X 좌표')
-plt.ylabel('하천 Y 좌표')
-plt.grid(True) # 격자 표시
-plt.legend() # 범례 표시
-plt.show() # 그래프 출력
+            // 4. Chart.js 데이터 준비
+            const chartData = {
+                datasets: [
+                    {
+                        label: '훈련 데이터 (실제 상태)',
+                        data: trainData.map(d => ({ x: d.x_coord, y: d.y_coord })),
+                        backgroundColor: trainData.map(d => colors[statusMap[d.status]]),
+                        borderColor: 'rgba(0, 0, 0, 0.5)',
+                        borderWidth: 1,
+                        pointRadius: 8,
+                        pointHoverRadius: 10,
+                        pointStyle: 'circle'
+                    },
+                    {
+                        label: '테스트 데이터 (예측 상태)',
+                        data: predictedResults.map(d => ({ x: d.x_coord, y: d.y_coord })),
+                        // 예측 확률에 따라 색상 농도 조절 (오염됨 상태에 대해)
+                        backgroundColor: predictedResults.map(d => {
+                            if (d.predictedStatus === 'polluted') {
+                                // 오염됨 확률에 따라 빨간색 농도 조절 (RGB)
+                                const proba = d.probabilities['polluted'];
+                                return `rgba(239, 68, 68, ${0.4 + proba * 0.6})`; // 최소 투명도 0.4, 최대 1.0
+                            }
+                            return colors[statusMap[d.predictedStatus]];
+                        }),
+                        borderColor: 'black',
+                        borderWidth: 2,
+                        pointRadius: 12,
+                        pointHoverRadius: 15,
+                        pointStyle: 'crossRot', // 'X' 마커
+                        rotation: 45 // 'X' 마커를 위한 회전
+                    }
+                ]
+            };
+
+            // 5. Chart.js 그래프 생성
+            const ctx = document.getElementById('pollutionChart').getContext('2d');
+            const pollutionChart = new Chart(ctx, {
+                type: 'scatter', // 산점도 타입
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true, // 비율 유지
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '하천 오염 상태 시각화',
+                            font: { size: 20, weight: 'bold' },
+                            color: '#333'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const index = context.dataIndex;
+                                    const datasetIndex = context.datasetIndex;
+                                    let label = context.dataset.label || '';
+
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    
+                                    if (datasetIndex === 0) { // 훈련 데이터
+                                        const originalData = trainData[index];
+                                        return [
+                                            `위치: (${originalData.x_coord}, ${originalData.y_coord})`,
+                                            `DO: ${originalData.DO}`,
+                                            `BOD: ${originalData.BOD}`,
+                                            `pH: ${originalData.pH}`,
+                                            `상태: ${originalData.status}`
+                                        ];
+                                    } else { // 테스트 데이터 (예측)
+                                        const predictedPoint = predictedResults[index];
+                                        const probas = predictedPoint.probabilities;
+                                        return [
+                                            `위치: (${predictedPoint.x_coord}, ${predictedPoint.y_coord})`,
+                                            `DO: ${predictedPoint.DO}`,
+                                            `BOD: ${predictedPoint.BOD}`,
+                                            `pH: ${predictedPoint.pH}`,
+                                            `예측 상태: ${predictedPoint.predictedStatus}`,
+                                            `확률: 깨끗함(${probas.clean.toFixed(2)}), 보통(${probas.normal.toFixed(2)}), 오염됨(${probas.polluted.toFixed(2)})`
+                                        ];
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: {
+                                display: true,
+                                text: '하천 X 좌표',
+                                font: { size: 16, weight: 'bold' }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: '하천 Y 좌표',
+                                font: { size: 16, weight: 'bold' }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 6. 예측 결과 텍스트로 표시
+            const predictionResultsDiv = document.getElementById('testPredictions');
+            predictedResults.forEach(point => {
+                const p = document.createElement('p');
+                const probas = point.probabilities;
+                p.innerHTML = `
+                    <span class="font-medium">위치 (${point.x_coord}, ${point.y_coord}):</span>
+                    DO: ${point.DO}, BOD: ${point.BOD}, pH: ${point.pH} <br>
+                    &nbsp;&nbsp;&nbsp;예측 상태: <span class="font-bold" style="color:${colors[statusMap[point.predictedStatus]]}">${point.predictedStatus}</span><br>
+                    &nbsp;&nbsp;&nbsp;확률: 깨끗함(${probas.clean.toFixed(2)}), 보통(${probas.normal.toFixed(2)}), 오염됨(${probas.polluted.toFixed(2)})
+                `;
+                p.classList.add('mb-2', 'pb-2', 'border-b', 'border-gray-200');
+                predictionResultsDiv.appendChild(p);
+            });
+        });
+    </script>
+</body>
+</html>
 
